@@ -1,0 +1,178 @@
+#!/bin/bash
+
+DB_FILE="employee_data.txt"
+
+get_next_emp_num() {
+    if [[ ! -f "$DB_FILE" ]]; then
+        echo 1
+    else
+        highest_emp_num=$(awk -F',' '{print $1}' "$DB_FILE" | sort -nr | head -n 1)
+        echo "$((highest_emp_num + 1))"
+    fi
+}
+
+insert_data() {
+    emp_num=$(get_next_emp_num)
+    echo "Enter Name:"
+    read name
+    echo "Enter Post:"
+    read post
+    echo "Enter Salary:"
+    read salary
+    echo "Enter City:"
+    read city
+
+    echo "$emp_num,$name,$post,$salary,$city" >> "$DB_FILE"
+    echo "Data inserted successfully."
+}
+
+display_data() {
+    echo "Employee Number,Name,Post,Salary,City"
+    cat "$DB_FILE"
+}
+
+delete_data() {
+    echo "Enter the employee number to delete:"
+    read del_emp_num
+
+   
+    temp_file=$(mktemp --tmpdir)
+
+    
+    while IFS=',' read -r emp_num name post salary city; do
+    
+        if [[ "$emp_num" != "$del_emp_num" ]]; then
+            echo "$emp_num,$name,$post,$salary,$city" >> "$temp_file"
+        fi
+    done < "$DB_FILE"
+
+    
+    mv "$temp_file" "$DB_FILE"
+    echo "Data deleted successfully."
+}
+
+modify_data() {
+    echo "Enter the employee number to modify:"
+    read emp_num
+    echo "Enter number for modifying:
+       1) name
+       2) city
+       3) post
+       4) salary"
+    read choice
+
+    temp_file=$(mktemp --tmpdir)
+
+    case $choice in
+        1) echo "Enter new name:"
+           read new_name
+           ;;
+        2) echo "Enter new city:"
+           read new_city
+           ;;
+        3) echo "Enter new post:"
+           read new_post
+           ;;
+        4) echo "Enter new salary:"
+           read new_salary
+           ;;
+        *) echo "Invalid choice";;
+    esac
+
+    while IFS=',' read -r e_num name post salary city; do
+        if [[ "$e_num" == "$emp_num" ]]; then
+            case $choice in
+                1) echo "$e_num,$new_name,$post,$salary,$city" >> "$temp_file"
+                   ;;
+                2) echo "$e_num,$name,$post,$salary,$new_city" >> "$temp_file"
+                   ;;
+                3) echo "$e_num,$name,$new_post,$salary,$city" >> "$temp_file"
+                   ;;
+                4) echo "$e_num,$name,$post,$new_salary,$city" >> "$temp_file"
+                   ;;
+            esac
+        else
+            echo "$e_num,$name,$post,$salary,$city" >> "$temp_file"
+        fi
+    done < "$DB_FILE"
+
+    mv "$temp_file" "$DB_FILE"
+    echo "Data modified successfully."
+}
+
+count_records() {
+    num_records=$(wc -l < "$DB_FILE")
+    echo "Number of records: $num_records"
+}
+
+sort_data() {
+    local temp_sorted_file=$(mktemp --tmpdir)
+    local sorted_db_file="sorted_employee_data.txt"
+    local sort_choice
+
+    echo "Select field to sort:"
+    echo "1) Employee Number"
+    echo "2) Name"
+    echo "3) Post"
+    echo "4) Salary"    
+    read sort_choice
+
+    case $sort_choice in
+        1) sort_field=1;;
+        2) sort_field=2;;
+        3) sort_field=3;;
+        4) sort_field=4;;
+        *) echo "Invalid choice"; return;;
+    esac
+
+    
+    IFS=$'\n' read -d '' -r -a lines < "$DB_FILE"
+
+    n=${#lines[@]}
+    for ((i = 0; i < n; i++)); do
+        for ((j = 0; j < n - i - 1; j++)); do
+            line1=$(echo "${lines[j]}" | cut -d ',' -f "$sort_field")
+            line2=$(echo "${lines[j+1]}" | cut -d ',' -f "$sort_field")
+            if [[ "$line1" > "$line2" ]]; then
+                temp="${lines[j]}"
+                lines[j]="${lines[j + 1]}"
+                lines[j + 1]="$temp"
+            fi
+        done
+    done
+
+   
+    printf "%s\n" "${lines[@]}" > "$temp_sorted_file"
+
+   
+    echo "Data sorted successfully."
+    cp "$temp_sorted_file" "$sorted_db_file"
+    echo "Sorted data saved to $sorted_db_file"
+
+    
+    rm "$temp_sorted_file"
+}
+
+
+while true; do
+    echo "Select an operation:"
+    echo "a) Insert data"
+    echo "b) Display data"
+    echo "c) Delete data"
+    echo "d) Modify data"
+    echo "e) Count number of records"
+    echo "f) Sort data"
+    echo "q) Quit"
+
+    read choice
+    case $choice in
+        a) insert_data;;
+        b) display_data;;
+        c) delete_data;;
+        d) modify_data;;
+        e) count_records;;
+        f) sort_data;;
+        q) exit;;
+        *) echo "Invalid choice";;
+    esac
+done
